@@ -8,14 +8,19 @@ import os
 
 from . import prompt
 
+def SYSTEM(message: str = ""): return {"role": "system", "content": message}
+def USER(message: str = ""): return {"role": "user", "content": message}
+def ASSISTANT(message: str = ""): return {"role": "assistant", "content": message}
+
 class LLM:
     def __init__(self, apikey: str, model: str, url: str = ""):
         self.client = OpenAI(api_key=apikey, base_url=url)
         self.model = model
         self.messages = [
-            {"role": "system", "content": prompt.loadPrompt("SYSTEM")}
+            {SYSTEM(prompt.loadPrompt("SYSTEM"))}
         ]
-    def __call__(self, saveMessage: bool = True):
+    def __call__(self, userMessage, saveMessage: bool = True):
+        self.messages.append(userMessage)
         res = self.client.chat.completions.create(
             model = self.model,
             messages = self.messages,
@@ -23,5 +28,7 @@ class LLM:
         )
         value = yaml.safe_load(res)
         print(value)
+        if saveMessage:
+            self.messages.append(ASSISTANT(res))
 
-default = LLM(apikey = os.getenv("DEEPSEEK_API_KEY"))
+defaultLLM = LLM(apikey = os.getenv("DEEPSEEK_API_KEY"))
