@@ -1,0 +1,9 @@
+patchFile:
+edit a section of a file(i.e. change all [start, end) lines to a new content, zero index)
+
+type: "PatchFile"
+data:
+  name: "file name to patch"
+  start: 10 # A number, indicating the start line of the content that will be replaced
+  end: 20 # A number, indicating the end line of the content that will be replaced
+  content: "The new content"

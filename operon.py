@@ -6,7 +6,8 @@ from pathlib import Path
 srcPath = Path(__file__).parent
 
 if __name__ == "__main__":
-    sessions = json.load(open(srcPath / "operon" / "session.js"))
+    print(srcPath)
+    sessions = json.load(open(srcPath / "operon" / "session.json"))
     print("Choose sessions to start - leave empty for new session")
     print(list(sessions.keys()))
     session = ""
@@ -44,6 +45,11 @@ if __name__ == "__main__":
             }))
         elif res["type"] == "Error":
             msg = operon.USER(res["data"])
+        elif res["type"] == "MetaError":
+            print("Error happens because of system error")
+            print("Enter to retry", end = "\n")
+            input()
+            msg = None
         else:
             msg = operon.USER(server(res))
     open(srcPath / "operon" / "task.json", "w").write(json.dumps(server.tasks))
@@ -52,5 +58,5 @@ if __name__ == "__main__":
         sessions[sessionName] = llm.messages
     else:
         sessions[session] = llm.messages
-    json.dump(sessions, open(srcPath / "operon" / "session.js"))
+    json.dump(sessions, open(srcPath / "operon" / "session.json"))
     

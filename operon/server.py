@@ -9,6 +9,7 @@ import json
 import requests
 import base64
 from bs4 import BeautifulSoup
+import shutil
 
 rootPath = Path(__file__).parent.parent / "file"
 srcPath = Path(__file__).parent
@@ -46,7 +47,7 @@ class ToolServer:
             })
         elif value["type"] == "ReadFile":
             res = value["data"]
-            name, start, end = res["name"], res["start"], res["end"]
+            name, start, end = res["name"], res.get("start", None), res.get("end", None)
             if not (rootPath / name.lstrip("/\\")).exists():
                 return yaml.dump({
                     "type": "Error",
@@ -57,7 +58,7 @@ class ToolServer:
                     "type": "Error",
                     "data": f"{name} is not a file"
                 })
-            content = open(rootPath / name.lstrip("/\\")).read()
+            content = open(rootPath / name.lstrip("/\\"), encoding="UTF-8").read()
             lines = content.splitlines(keepends=True)
             if start is None: start = 0
             if end is None: end = len(lines)
@@ -69,7 +70,17 @@ class ToolServer:
             res = value["data"]
             name, content, typ = res["name"], res["content"], res["type"]
             print(rootPath / name.lstrip("/\\"))
-            if not (rootPath / name.lstrip("/\\")).exists():
+            (rootPath / name.lstrip("/\\")).parent.mkdir(parents=True, exist_ok=True)
+            open(rootPath / name.lstrip("/\\"), typ, encoding="UTF-8").write(content)
+            return yaml.dump({
+                "type": "Result",
+                "data": None
+            })
+        elif value["type"] == "PatchFile":
+            res = value["data"]
+            name, start, end, content = res["name"], res["start"], res["end"], res["content"]
+            pth = rootPath / name.lstrip("/\\")
+            if not pth.exists():
                 return yaml.dump({
                     "type": "Error",
                     "data": f"File {name} doesn't exist"
@@ -79,7 +90,31 @@ class ToolServer:
                     "type": "Error",
                     "data": f"{name} is not a file"
                 })
-            open(rootPath / name.lstrip("/\\"), typ).write(content)
+            if start < 0 or end < start:
+                return yaml.dump({
+                    "type": "Error",
+                    "data": f"Invalid range [{start}, {end})"
+                })
+            lines = pth.read_text(
+                encoding="utf-8"
+            ).splitlines(keepends=True)
+            if start > len(lines):
+                return yaml.dump({
+                    "type": "Error",
+                    "data": "start exceeds file length"
+                })
+            replacement = content.splitlines(
+                keepends=True
+            )
+            new_lines = (
+                lines[:start]
+                + replacement
+                + lines[end:]
+            )
+            pth.write_text(
+                "".join(new_lines),
+                encoding="utf-8"
+            )
             return yaml.dump({
                 "type": "Result",
                 "data": None
@@ -108,6 +143,15 @@ class ToolServer:
             return yaml.dump({
                 "type": "Result",
                 "data": [p.name for p in Path(path).iterdir()]
+            })
+        elif value["type"] == "Move":
+            res = value["data"]
+            src, dest = res["src"], res["dest"]
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(src, dest)
+            return yaml.dump({
+                "type": "Result",
+                "data": None
             })
         elif value["type"] == "Task":
             res = value["data"]

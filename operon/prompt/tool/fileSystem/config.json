@@ -10,5 +10,11 @@
     },
     "ls": {
         "fileName": "ls"
+    },
+    "move": {
+        "fileName": "move"
+    },
+    "patchFile": {
+        "fileName": "patchFile"
     }
 }

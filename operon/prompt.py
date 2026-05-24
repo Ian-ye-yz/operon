@@ -31,4 +31,4 @@ def loadSystemPrompt():
     template = template.replace(r"{{INSERT_TOOLS}}", toolPrompt)
     return template
 
-print(loadSystemPrompt())
+# print(loadSystemPrompt())

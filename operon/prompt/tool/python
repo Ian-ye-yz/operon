@@ -5,4 +5,5 @@ format of such tool call:
 type: "Python"
 data:
   code: "code to execute"
-  result: "a variable name, its value will be returned to you
+
+The standard output will be returned
