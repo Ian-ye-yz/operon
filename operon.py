@@ -43,6 +43,14 @@ if __name__ == "__main__":
                 "type": "Message",
                 "data": command
             }))
+        elif res["type"] == "AskUser":
+            print("LLM: ", res["data"])
+            command = input(">>> ")
+            if command == ":exit": break
+            msg = operon.USER(yaml.dump({
+                "type": "Message",
+                "data": command
+            }))
         elif res["type"] == "Error":
             msg = operon.USER(res["data"])
         elif res["type"] == "MetaError":

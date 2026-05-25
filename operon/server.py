@@ -10,6 +10,10 @@ import requests
 import base64
 from bs4 import BeautifulSoup
 import shutil
+import subprocess
+import sys
+import io
+import contextlib
 
 rootPath = Path(__file__).parent.parent / "file"
 srcPath = Path(__file__).parent
@@ -39,12 +43,58 @@ class ToolServer:
         self.scratchPad = ""
     def __call__(self, value):
         if value["type"] == "Python":
-            result = {}
-            exec(value["data"]["code"], {}, result)
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                exec(value["data"]["code"])
             return yaml.dump({
                 "type": "Result",
-                "data": result[value["result"]]
+                "data": repr(buffer.getvalue())
             })
+        elif value["type"] == "Shell":
+            res = value["data"]
+            command = res["command"]
+            cwd = res.get("cwd", ".")
+            pth = rootPath / cwd.lstrip("/\\")
+            if not pth.exists():
+                return yaml.dump({
+                    "type": "Error",
+                    "data": f"cwd {cwd} doesn't exist"
+                })
+            if not pth.is_dir():
+                return yaml.dump({
+                    "type": "Error",
+                    "data": f"cwd {cwd} is not a directory"
+                })
+            try:
+                completed = subprocess.run(
+                    command,
+                    cwd=pth,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=30
+                )
+                return yaml.dump({
+                    "type": "Result",
+                    "data": {
+                        "returncode": completed.returncode,
+                        "stdout": completed.stdout,
+                        "stderr": completed.stderr,
+                        "cwd": str(pth),
+                    }
+                })
+            except subprocess.TimeoutExpired:
+                return yaml.dump({
+                    "type": "Error",
+                    "data": "Shell command timed out"
+                })
+            except Exception as e:
+                return yaml.dump({
+                    "type": "Error",
+                    "data": str(e)
+                })
         elif value["type"] == "ReadFile":
             res = value["data"]
             name, start, end = res["name"], res.get("start", None), res.get("end", None)

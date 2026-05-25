@@ -1,0 +1,8 @@
+Shell:
+Run one or many shell commands
+Note that change on cwd or env vairables won't be saved across multiple Shell runs
+
+type: "Shell"
+data:
+  command: "Shell command to run"
+  cwd: "Current working directory of this specific shell run"

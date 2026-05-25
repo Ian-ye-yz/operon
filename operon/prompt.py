@@ -27,7 +27,7 @@ def loadSystemPrompt():
     toolList = loadFromFile(toolPath)
     toolPrompt = ""
     for pos, i in enumerate(toolList):
-        toolPrompt += f"{pos + 3}: {i}\n\n"
+        toolPrompt += f"{pos + 4}: {i}\n\n"
     template = template.replace(r"{{INSERT_TOOLS}}", toolPrompt)
     return template
 
