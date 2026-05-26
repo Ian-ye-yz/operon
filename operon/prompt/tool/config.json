@@ -2,6 +2,9 @@
     "python": {
         "fileName": "python"
     },
+    "shell": {
+        "fileName": "shell"
+    },
     "fileSystem": {
         "fileName": "fileSystem"
     },

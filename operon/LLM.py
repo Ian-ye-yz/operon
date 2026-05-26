@@ -45,7 +45,11 @@ class LLM:
                 except:
                     return {
                         "type": "Error",
-                        "data": "Yaml Error because of incorrect format, please try again"
+                        "data": """Yaml Error because of incorrect format, please try again
+Here's an example of valid Yaml
+type: "Print"
+data: "This is an example of Print tool, to print messages to user"
+"""
                     }
             except Exception as e:
                 last_err = e

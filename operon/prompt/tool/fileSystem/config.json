@@ -16,5 +16,8 @@
     },
     "patchFile": {
         "fileName": "patchFile"
+    },
+    "searchInFiles": {
+        "fileName": "searchInFiles"
     }
 }

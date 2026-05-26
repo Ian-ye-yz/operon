@@ -14,6 +14,8 @@ import subprocess
 import sys
 import io
 import contextlib
+import re
+import os
 
 rootPath = Path(__file__).parent.parent / "file"
 srcPath = Path(__file__).parent
@@ -44,8 +46,13 @@ class ToolServer:
     def __call__(self, value):
         if value["type"] == "Python":
             buffer = io.StringIO()
-            with contextlib.redirect_stdout(buffer):
-                exec(value["data"]["code"])
+            curCwd = os.getcwd()
+            try:
+                os.chdir(rootPath)
+                with contextlib.redirect_stdout(buffer):
+                    exec(value["data"]["code"])
+            finally:
+                os.chdir(curCwd)
             return yaml.dump({
                 "type": "Result",
                 "data": repr(buffer.getvalue())
@@ -157,9 +164,7 @@ class ToolServer:
                 keepends=True
             )
             new_lines = (
-                lines[:start]
-                + replacement
-                + lines[end:]
+                lines[:start] + replacement + lines[end:]
             )
             pth.write_text(
                 "".join(new_lines),
@@ -168,6 +173,122 @@ class ToolServer:
             return yaml.dump({
                 "type": "Result",
                 "data": None
+            })
+        elif value["type"] == "SearchInFiles":
+            res = value["data"]
+            path = res["path"]
+            query = res["query"]
+            use_regex = res.get("regex", False)
+            case_sensitive = res.get("caseSensitive", False)
+            include = res.get("include", ["*"])
+            exclude = res.get("exclude", [])
+            context = res.get("context", 0)
+            max_results = res.get("maxResults", 50)
+            base = rootPath.resolve()
+            target = (base / path.lstrip("/\\")).resolve()
+            if not str(target).startswith(str(base)):
+                return yaml.dump({
+                    "type": "Error",
+                    "data": "Path escapes rootPath"
+                })
+            if not target.exists():
+                return yaml.dump({
+                    "type": "Error",
+                    "data": f"Path {path} doesn't exist"
+                })
+            if context < 0:
+                return yaml.dump({
+                    "type": "Error",
+                    "data": "context must be >= 0"
+                })
+            if max_results <= 0:
+                return yaml.dump({
+                    "type": "Error",
+                    "data": "maxResults must be > 0"
+                })
+            flags = 0 if case_sensitive else re.IGNORECASE
+            try:
+                if use_regex:
+                    pattern = re.compile(query, flags)
+                else:
+                    pattern = re.compile(re.escape(query), flags)
+            except re.error as e:
+                return yaml.dump({
+                    "type": "Error",
+                    "data": f"Invalid regex: {e}"
+                })
+            MAX_FILE_SIZE = 2 * 1024 * 1024
+            def is_excluded(file: Path) -> bool:
+                rel = file.relative_to(base).as_posix()
+                return any(file.match(pat) or rel.startswith(pat.rstrip("/")) or Path(rel).match(pat) for pat in exclude)
+            def is_included(file: Path) -> bool:
+                rel = file.relative_to(base).as_posix()
+                return any(file.match(pat) or Path(rel).match(pat) for pat in include)
+            def looks_binary(file: Path) -> bool:
+                try:
+                    chunk = file.read_bytes()[:4096]
+                    return b"\x00" in chunk
+                except Exception:
+                    return True
+            if target.is_file():
+                files = [target]
+            else:
+                files = [p for p in target.rglob("*") if p.is_file()]
+            matches = []
+            truncated = False
+            for file in files:
+                if not is_included(file): continue
+                if is_excluded(file): continue
+                try:
+                    if file.stat().st_size > MAX_FILE_SIZE: continue
+                except OSError: continue
+                if looks_binary(file): continue
+                try:
+                    lines = file.read_text(
+                        encoding="utf-8",
+                        errors="replace"
+                    ).splitlines()
+                except Exception:
+                    continue
+                for line_no, line in enumerate(lines):
+                    for m in pattern.finditer(line):
+                        item = {
+                            "file": "/" + file.relative_to(base).as_posix(),
+                            "line": line_no,
+                            "column": m.start(),
+                            "content": line,
+                        }
+                        if context > 0:
+                            before_start = max(0, line_no - context)
+                            after_end = min(len(lines), line_no + context + 1)
+                            item["before"] = [{
+                                    "line": i,
+                                    "content": lines[i],
+                                }
+                                for i in range(before_start, line_no)
+                            ]
+                            item["after"] = [{
+                                    "line": i,
+                                    "content": lines[i],
+                                }
+                                for i in range(line_no + 1, after_end)
+                            ]
+                        matches.append(item)
+                        if len(matches) >= max_results:
+                            truncated = True
+                            return yaml.dump({
+                                "type": "Result",
+                                "data": {
+                                    "truncated": truncated,
+                                    "matches": matches,
+                                }
+                            })
+            return yaml.dump({
+                "type": "Result",
+                "data": {
+                    "truncated": truncated,
+                    "matches": matches,
+                }
             })
         elif value["type"] == "Mkdir":
             res = value["data"]
